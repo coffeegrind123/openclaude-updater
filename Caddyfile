@@ -1,0 +1,16 @@
+{
+	auto_https disable_redirects
+}
+
+cs16.net:443 {
+	tls /etc/letsencrypt/live/cs16.net/fullchain.pem /etc/letsencrypt/live/cs16.net/privkey.pem
+
+	handle /openclaude/* {
+		uri strip_prefix /openclaude
+		reverse_proxy localhost:3457
+	}
+
+	handle {
+		respond "Not Found" 404
+	}
+}

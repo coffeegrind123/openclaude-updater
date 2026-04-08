@@ -1,0 +1,14 @@
+[Unit]
+Description=OpenClaude Release Proxy
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/openclaude-releases
+EnvironmentFile=/opt/openclaude-releases/.env
+ExecStart=/root/.bun/bin/bun run server.ts
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
