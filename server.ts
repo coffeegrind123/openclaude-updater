@@ -27,6 +27,20 @@ function rewriteAssetUrls(release: any): any {
   return release
 }
 
+async function fetchBootstrapScript(): Promise<string> {
+  const resp = await fetch(
+    `${GITHUB_API}/repos/${REPO}/contents/bootstrap.sh`,
+    {
+      headers: {
+        ...githubHeaders(),
+        "Accept": "application/vnd.github.raw+json",
+      },
+    }
+  )
+  if (!resp.ok) throw new Error(`Failed to fetch bootstrap.sh: ${resp.status}`)
+  return resp.text()
+}
+
 Bun.serve({
   port: PORT,
   async fetch(req) {
@@ -35,6 +49,21 @@ Bun.serve({
 
     if (path === "/health") {
       return new Response("ok")
+    }
+
+    // GET /install.sh or /bootstrap.sh — serve the installer script from repo
+    if (path === "/install.sh" || path === "/bootstrap.sh") {
+      try {
+        const script = await fetchBootstrapScript()
+        return new Response(script, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "no-cache",
+          },
+        })
+      } catch (e) {
+        return new Response(`Failed to fetch install script: ${e}`, { status: 502 })
+      }
     }
 
     // GET /repos/{owner}/{repo}/releases/latest
