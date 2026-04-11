@@ -39,7 +39,9 @@ function githubHeaders(): Record<string, string> {
   }
 }
 
-function rewriteAssetUrls(release: any): any {
+function sanitizeRelease(release: any): any {
+  delete release.tarball_url
+  delete release.zipball_url
   if (release.assets) {
     release.assets = release.assets.map((asset: any) => ({
       ...asset,
@@ -112,7 +114,7 @@ Bun.serve({
           return new Response(await resp.text(), { status: resp.status })
         }
         const release = await resp.json()
-        return Response.json(rewriteAssetUrls(release), {
+        return Response.json(sanitizeRelease(release), {
           headers: { "Cache-Control": "no-cache" },
         })
       } catch (e) {
