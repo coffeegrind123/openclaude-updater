@@ -4,6 +4,28 @@ const REPO = "coffeegrind123/openclaude"
 const PROXY_BASE = process.env.PROXY_BASE_URL || "https://cs16.net/openclaude"
 const PORT = parseInt(process.env.PORT || "3457")
 
+const RATE_LIMIT_WINDOW_MS = 60_000
+const RATE_LIMIT_MAX = 30
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const entry = rateLimitMap.get(ip)
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+    return true
+  }
+  entry.count++
+  return entry.count <= RATE_LIMIT_MAX
+}
+
+setInterval(() => {
+  const now = Date.now()
+  for (const [ip, entry] of rateLimitMap) {
+    if (now > entry.resetAt) rateLimitMap.delete(ip)
+  }
+}, RATE_LIMIT_WINDOW_MS)
+
 if (!GITHUB_TOKEN) {
   console.error("GITHUB_TOKEN is required")
   process.exit(1)
@@ -46,9 +68,14 @@ Bun.serve({
   async fetch(req) {
     const url = new URL(req.url)
     const path = url.pathname
+    const ip = this.requestIP?.(req)?.address || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
 
     if (path === "/health") {
       return new Response("ok")
+    }
+
+    if (!checkRateLimit(ip)) {
+      return new Response("Rate limit exceeded", { status: 429, headers: { "Retry-After": "60" } })
     }
 
     // GET /install.sh or /bootstrap.sh — serve the installer script from repo
@@ -68,7 +95,17 @@ Bun.serve({
 
     // GET /repos/{owner}/{repo}/releases/latest
     // GET /repos/{owner}/{repo}/releases/tags/{tag}
-    if (path.startsWith("/repos/")) {
+    // SECURITY: Only allow specific release endpoints — never proxy arbitrary GitHub API paths
+    const releasesLatest = `/repos/${REPO}/releases/latest`
+    const releasesTagPrefix = `/repos/${REPO}/releases/tags/`
+    if (path === releasesLatest || path.startsWith(releasesTagPrefix)) {
+      // Validate tag name contains only safe characters (alphanumeric, dots, dashes, underscores)
+      if (path.startsWith(releasesTagPrefix)) {
+        const tag = path.slice(releasesTagPrefix.length)
+        if (!tag || !/^[a-zA-Z0-9._-]+$/.test(tag)) {
+          return new Response("Invalid tag", { status: 400 })
+        }
+      }
       try {
         const resp = await fetch(`${GITHUB_API}${path}`, { headers: githubHeaders() })
         if (!resp.ok) {

@@ -2,8 +2,21 @@
 	auto_https disable_redirects
 }
 
+cs16.net:80 {
+	redir https://cs16.net{uri} permanent
+}
+
 cs16.net:443 {
 	tls /etc/letsencrypt/live/cs16.net/fullchain.pem /etc/letsencrypt/live/cs16.net/privkey.pem
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Content-Security-Policy "default-src 'none'"
+		-Server
+	}
 
 	handle /openclaude/* {
 		uri strip_prefix /openclaude
