@@ -2,10 +2,6 @@
 	auto_https disable_redirects
 }
 
-cs16.net:80 {
-	redir https://cs16.net{uri} permanent
-}
-
 cs16.net:443 {
 	tls /etc/letsencrypt/live/cs16.net/fullchain.pem /etc/letsencrypt/live/cs16.net/privkey.pem
 
