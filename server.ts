@@ -102,6 +102,31 @@ Bun.serve({
       }
     }
 
+    // Serve the OpenClaude brand icon (the Claude logo, not Bun's). Served from
+    // the repo working tree on disk (committed alongside this server), so it
+    // survives a plain `git pull` deploy. Reached at cs16.net/openclaude/<route>
+    // (Caddy strips the /openclaude prefix). nosniff is set globally, so the
+    // Content-Type must be exact.
+    const ICON_ROUTES: Record<string, { file: string; type: string }> = {
+      "/favicon.ico": { file: "claude_icon.ico", type: "image/x-icon" },
+      "/icon.ico": { file: "claude_icon.ico", type: "image/x-icon" },
+      "/icon.png": { file: "claude_icon_256.png", type: "image/png" },
+      "/openclaude.png": { file: "claude_icon_256.png", type: "image/png" },
+    }
+    if (ICON_ROUTES[path]) {
+      const { file, type } = ICON_ROUTES[path]
+      const f = Bun.file(`${import.meta.dir}/${file}`)
+      if (!(await f.exists())) {
+        return new Response("Icon not found", { status: 404 })
+      }
+      return new Response(f, {
+        headers: {
+          "Content-Type": type,
+          "Cache-Control": "public, max-age=86400",
+        },
+      })
+    }
+
     // GET /repos/{owner}/{repo}/releases/latest
     // GET /repos/{owner}/{repo}/releases/tags/{tag}
     // SECURITY: Only allow specific release endpoints — never proxy arbitrary GitHub API paths
