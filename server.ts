@@ -51,9 +51,9 @@ function sanitizeRelease(release: any): any {
   return release
 }
 
-async function fetchBootstrapScript(): Promise<string> {
+async function fetchRepoFile(file: string): Promise<string> {
   const resp = await fetch(
-    `${GITHUB_API}/repos/${REPO}/contents/bootstrap.sh`,
+    `${GITHUB_API}/repos/${REPO}/contents/${file}`,
     {
       headers: {
         ...githubHeaders(),
@@ -61,7 +61,7 @@ async function fetchBootstrapScript(): Promise<string> {
       },
     }
   )
-  if (!resp.ok) throw new Error(`Failed to fetch bootstrap.sh: ${resp.status}`)
+  if (!resp.ok) throw new Error(`Failed to fetch ${file}: ${resp.status}`)
   return resp.text()
 }
 
@@ -80,10 +80,17 @@ Bun.serve({
       return new Response("Rate limit exceeded", { status: 429, headers: { "Retry-After": "60" } })
     }
 
-    // GET /install.sh or /bootstrap.sh — serve the installer script from repo
-    if (path === "/install.sh" || path === "/bootstrap.sh") {
+    // Serve the installer scripts straight from the repo.
+    //   /install.sh, /bootstrap.sh -> bootstrap.sh (Linux/macOS)
+    //   /install.ps1               -> install.ps1  (Windows / PowerShell)
+    const SCRIPT_ROUTES: Record<string, string> = {
+      "/install.sh": "bootstrap.sh",
+      "/bootstrap.sh": "bootstrap.sh",
+      "/install.ps1": "install.ps1",
+    }
+    if (SCRIPT_ROUTES[path]) {
       try {
-        const script = await fetchBootstrapScript()
+        const script = await fetchRepoFile(SCRIPT_ROUTES[path])
         return new Response(script, {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
